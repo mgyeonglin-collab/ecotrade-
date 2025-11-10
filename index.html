@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TrashTrade — Part 1 (Core)</title>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang&display=swap" rel="stylesheet">
+<style>
+:root{
+  --main-green:#6BA368;
+  --light-green:#A1C181;
+  --ivory:#F7F4EA;
+  --accent-yellow:#F9CC66;
+  --text-dark:#2B2B2B;
+  --muted:#6f6f6f;
+  --card-shadow: 0 6px 18px rgba(0,0,0,0.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Gowun Batang',serif;
+  background:var(--ivory) url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+  color:var(--text-dark);
+  -webkit-font-smoothing:antialiased;
+  line-height:1.45;
+  padding-bottom:60px;
+}
+
+/* Header */
+.header{
+  display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--light-green);
+  color:#fff;border-bottom:3px solid var(--main-green);
+}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--main-green),var(--light-green));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800}
+.header-actions{display:flex;gap:10px;align-items:center}
+.btn{background:var(--accent-yellow);border:none;padding:8px 12px;border-radius:10px;font-weight:700;cursor:pointer}
+.icon-btn{background:transparent;border:none;color:#fff;cursor:pointer;font-weight:700;padding:8px}
+
+/* Layout */
+.container{max-width:1100px;margin:18px auto;padding:0 18px}
+.hero{background:#fff;border-radius:14px;padding:20px;margin:16px 0;box-shadow:var(--card-shadow);text-align:center}
+.hero h2{color:var(--main-green);font-size:24px;margin-bottom:8px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
+.controls input,.controls select{padding:8px 10px;border-radius:10px;border:1px solid #e6e6e6}
+
+/* Grid / Cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;max-width:1100px;margin:0 auto}
+.card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--card-shadow);display:flex;flex-direction:column;transition:transform .15s}
+.card:hover{transform:translateY(-6px)}
+.card img{width:100%;height:160px;object-fit:cover}
+.card-content{padding:12px;display:flex;flex-direction:column;gap:8px}
+.card-content h3{color:var(--main-green);font-size:17px}
+.card-content p{color:#444;font-size:14px;min-height:44px}
+.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:auto}
+.tag{background:var(--light-green);color:#fff;padding:6px 10px;border-radius:8px;font-size:13px}
+.exchange-btn{background:var(--main-green);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+
+/* Panel (right) */
+.panel-toggle{position:fixed;right:18px;top:96px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--main-green),var(--light-green));color:#fff;border:none;cursor:pointer;z-index:60}
+.panel{position:fixed;right:-380px;top:0;width:360px;height:100%;background:#fff;box-shadow:-8px 0 30px rgba(0,0,0,0.12);padding:16px;transition:right .35s;z-index:59;overflow:auto}
+.panel.open{right:0}
+.section{margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed #f0f0f0}
+.profile-row{display:flex;align-items:center;gap:10px}
+.avatar{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--main-green),var(--light-green));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800}
+.small{font-size:13px;color:var(--muted)}
+.chat-list{max-height:220px;overflow:auto}
+.chat-item{padding:8px;border-radius:8px;border:1px solid #f0f0f0;margin-bottom:8px;cursor:pointer}
+.chat-item:hover{background:#fafafa}
+
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center;padding:16px;z-index:70}
+.modal{background:#fff;border-radius:12px;padding:16px;max-width:820px;width:100%;max-height:90vh;overflow:auto}
+.form-row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.form-row input[type="text"],.form-row textarea,.form-row select{width:100%;padding:8px;border-radius:8px;border:1px solid #e6e6e6}
+.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.preview{width:140px;height:100px;border-radius:8px;background:#f3f3f3;display:flex;align-items:center;justify-content:center;color:#999}
+
+/* Responsive */
+@media(max-width:900px){ .grid{grid-template-columns:repeat(2,1fr)} .panel{width:320px} .panel.open{right:0} .panel-toggle{right:12px} }
+@media(max-width:600px){ .grid{grid-template-columns:repeat(1,1fr)} .panel{width:100%;right:-100%} .panel.open{right:0} .panel-toggle{display:none} }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    <div class="logo">TT</div>
+    <div>
+      <div style="font-weight:800;font-size:18px">TrashTrade 🌿</div>
+      <div class="small">지역 기반 자원 교환 (시·도 → 시·군·구)</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="btnRegister">물품 등록</button>
+    <button class="btn" id="btnLogin">로그인 / 회원</button>
+    <button class="btn" id="btnMyActivity">내 활동</button>
+    <button id="panelToggle" class="panel-toggle" title="사이드 패널 열기">☰</button>
+  </div>
+</div>
+
+<div class="container">
+  <section class="hero">
+    <h2>지역에서 시작하는 순환 — TrashTrade</h2>
+    <p class="small">회원가입 후 물품을 등록하세요. 교환 제안 → 수락 → 거래 완료 흐름이 작동합니다.</p>
+  </section>
+
+  <div class="controls">
+    <input id="searchInput" placeholder="물품명 또는 설명 검색">
+    <select id="categoryFilter">
+      <option value="">전체 카테고리</option>
+      <option value="책">책</option>
+      <option value="의류">의류</option>
+      <option value="전자기기">전자기기</option>
+      <option value="기타">기타</option>
+    </select>
+    <select id="sidoSelect"><option value="">시·도 선택</option></select>
+    <select id="sigunSelect"><option value="">시·군·구 선택</option></select>
+  </div>
+
+  <div id="grid" class="grid" aria-live="polite"></div>
+
+  <div id="dashboardArea"></div>
+</div>
+
+<!-- Side Panel -->
+<div id="panel" class="panel" aria-hidden="true">
+  <div class="section">
+    <div class="profile-row">
+      <div class="avatar" id="avatar">?</div>
+      <div>
+        <div id="profileName" style="font-weight:800">비로그인</div>
+        <div id="profileSchool" class="small">학교/지역 입력 필요</div>
+        <div class="small">포인트: <span id="profilePoints">0</span> · 교환: <span id="profileTrades">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h4>알림</h4>
+    <div id="notifList" style="max-height:200px;overflow:auto"></div>
+  </div>
+
+  <div class="section">
+    <h4>채팅</h4>
+    <div id="chatList" class="chat-list"></div>
+  </div>
+
+  <div class="section">
+    <h4>도움말</h4>
+    <div class="small">결제/배송 연결은 백엔드 연동 후 가능합니다. 현재 클라이언트는 로컬 저장소 기반 작동입니다.</div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true">
+  <div id="modal" class="modal"></div>
+</div>
+
+<script>
+/* =========================
+   TrashTrade - Part 1 (Core)
+   - No dummy users/items
+   - Full region select (시·도 -> 시·군·구 for many regions)
+   - Register / Login / Item register / Request / Chat (localStorage)
+   - Panel toggle
+   ========================= */
+
+/* ---------- Storage keys ---------- */
+const STORAGE = {
+  USERS: 'tt_users_core_v1',
+  ITEMS: 'tt_items_core_v1',
+  REQS: 'tt_reqs_core_v1',
+  CHATS: 'tt_chats_core_v1'
+};
+
+/* ---------- Utilities ---------- */
+const util = (function(){
+  function uid(prefix='id'){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+  function load(key){ try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ console.error('load err',e); return []; } }
+  function save(key, data){ localStorage.setItem(key, JSON.stringify(data)); }
+  function now(){ return Date.now(); }
+  return { uid, load, save, now };
+})();
+
+/* ---------- Region list (시·도 -> 시·군·구) ----------
+   This list contains major administrative districts for every province.
+   You can replace/extend with an official dataset or load from server in production.
+*/
+const REGION = {
+  '서울특별시': ['강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구','동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구','용산구','은평구','종로구','중구','중랑구'],
+  '부산광역시': ['강서구','금정구','기장군','남구','동구','동래구','부산진구','북구','사상구','사하구','서구','수영구','연제구','영도구','중구'],
+  '대구광역시': ['남구','달서구','달성군','동구','북구','서구','수성구','중구'],
+  '인천광역시': ['강화군','계양구','미추홀구','남동구','동구','부평구','서구','연수구','옹진군'],
+  '광주광역시': ['광산구','남구','동구','북구','서구'],
+  '대전광역시': ['대덕구','동구','서구','유성구','중구'],
+  '울산광역시': ['남구','동구','북구','울주군','중구'],
+  '세종특별자치시': ['세종시'],
+  '경기도': ['수원시','성남시','고양시','용인시','부천시','화성시','남양주시','안산시','안양시','평택시','의정부시','시흥시','파주시','광명시','김포시','광주시','하남시','이천시','양주시','오산시','구리시','군포시','양평군','연천군','여주시','가평군','포천시'],
+  '강원도': ['강릉시','고성군','동해시','삼척시','속초시','양구군','양양군','영월군','원주시','인제군','춘천시','태백시','평창군','홍천군','화천군','횡성군'],
+  '충청북도': ['청주시','충주시','제천시','보은군','옥천군','영동군','진천군','괴산군','음성군','단양군'],
+  '충청남도': ['천안시','공주시','보령시','아산시','서산시','논산시','계룡시','당진시','금산군','부여군','서천군','청양군','태안군','홍성군'],
+  '전라북도': ['전주시','군산시','익산시','정읍시','남원시','김제시','완주군','진안군','무주군','장수군','임실군','순창군','고창군','부안군'],
+  '전라남도': ['목포시','여수시','순천시','나주시','광양시','무안군','영암군','신안군','화순군','고흥군','장흥군','강진군','해남군','완도군','보성군','곡성군','담양군','영광군','장성군','진도군','함평군'],
+  '경상북도': ['포항시','경주시','김천시','안동시','구미시','영주시','영천시','상주시','문경시','경산시','군위군','의성군','청송군','영양군','영덕군','청도군','고령군','성주군','칠곡군','예천군','울진군','봉화군','울릉군'],
+  '경상남도': ['창원시','김해시','양산시','진주시','통영시','사천시','거제시','밀양시','함안군','거창군','합천군','창녕군','하동군','산청군','남해군','의령군','고성군','함양군'],
+  '제주특별자치도': ['제주시','서귀포시']
+};
+
+/* ---------- Initialize storage (empty arrays, no dummy users/items) ---------- */
+(function initStorage(){
+  if(!localStorage.getItem(STORAGE.USERS)) util.save(STORAGE.USERS, []);
+  if(!localStorage.getItem(STORAGE.ITEMS)) util.save(STORAGE.ITEMS, []);
+  if(!localStorage.getItem(STORAGE.REQS)) util.save(STORAGE.REQS, []);
+  if(!localStorage.getItem(STORAGE.CHATS)) util.save(STORAGE.CHATS, []);
+})();
+
+/* ---------- Application State ---------- */
+let users = util.load(STORAGE.USERS);
+let items = util.load(STORAGE.ITEMS);
+let requests = util.load(STORAGE.REQS);
+let chats = util.load(STORAGE.CHATS);
+let currentUserId = localStorage.getItem('tt_current_user') || null;
+
+/* ---------- DOM refs ---------- */
+const sidoSelect = document.getElementById('sidoSelect');
+const sigunSelect = document.getElementById('sigunSelect');
+const gridEl = document.getElementById('grid');
+const panelEl = document.getElementById('panel');
+const panelToggleBtn = document.getElementById('panelToggle');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalEl = document.getElementById('modal');
+
+/* ---------- Helpers ---------- */
+function persistAll(){
+  util.save(STORAGE.USERS, users);
+  util.save(STORAGE.ITEMS, items);
+  util.save(STORAGE.REQS, requests);
+  util.save(STORAGE.CHATS, chats);
+  if(currentUserId) localStorage.setItem('tt_current_user', currentUserId); else localStorage.removeItem('tt_current_user');
+}
+
+function findUser(id){ return users.find(u=>u.id===id) || null; }
+function findItem(id){ return items.find(i=>i.id===id) || null; }
+function findChat(id){ return chats.find(c=>c.id===id) || null; }
+
+/* ---------- Region selects population ---------- */
+function populateSido(){
+  sidoSelect.innerHTML = '<option value="">시·도 선택</option>';
+  Object.keys(REGION).forEach(sido=>{
+    const opt = document.createElement('option'); opt.value=sido; opt.textContent=sido; sidoSelect.appendChild(opt);
+  });
+  sidoSelect.addEventListener('change', ()=>{
+    const s = sidoSelect.value;
+    sigunSelect.innerHTML = '<option value="">시·군·구 선택</option>';
+    if(s && REGION[s]){
+      REGION[s].forEach(sg=>{
+        const o = document.createElement('option'); o.value=sg; o.textContent=sg; sigunSelect.appendChild(o);
+      });
+    }
+    renderGrid();
+  });
+  sigunSelect.addEventListener('change', ()=> renderGrid());
+}
+populateSido();
+
+/* ---------- Panel toggle ---------- */
+panelToggleBtn.addEventListener('click', ()=> {
+  panelEl.classList.toggle('open');
+  renderPanel();
+});
+
+/* ---------- Modal helpers ---------- */
+function openModal(html){
+  modalEl.innerHTML = html;
+  modalBackdrop.style.display = 'flex';
+}
+function closeModal(){ modalBackdrop.style.display = 'none'; }
+
+/* Close modal on backdrop click */
+modalBackdrop.addEventListener('click', (e)=>{ if(e.target === modalBackdrop) closeModal(); });
+
+/* ---------- Login / User management ---------- */
+document.getElementById('btnLogin').addEventListener('click', ()=> openLoginModal());
+function openLoginModal(){
+  openModal(`
+    <h3>로그인 / 회원 등록</h3>
+    <div class="form-row"><input id="loginName" placeholder="이름 (실명 또는 닉네임)"></div>
+    <div class="form-row"><input id="loginSchool" placeholder="학교/지역"></div>
+    <div class="form-actions"><button onclick="closeModal()">취소</button><button id="loginSaveBtn">저장</button></div>
+  `);
+  document.getElementById('loginSaveBtn').addEventListener('click', doLogin);
+}
+function doLogin(){
+  const name = document.getElementById('loginName').value.trim();
+  const school = document.getElementById('loginSchool').value.trim();
+  if(!name || !school){ alert('이름과 학교/지역을 입력하세요.'); return; }
+  users = util.load(STORAGE.USERS);
+  let me = users.find(u=> u.name === name && u.school === school);
+  if(!me){
+    me = { id: util.uid('u'), name, school, points:0, trades:0, eco:0, created: util.now() };
+    users.push(me); util.save(STORAGE.USERS, users);
+  }
+  currentUserId = me.id; localStorage.setItem('tt_current_user', currentUserId);
+  persistAll();
+  closeModal();
+  renderPanel();
+  renderGrid();
+  alert(`${me.name}님, 환영합니다!`);
+}
+
+/* ---------- Register item (with image upload & region selection) ---------- */
+document.getElementById('btnRegister').addEventListener('click', ()=> openRegisterModal());
+function openRegisterModal(){
+  if(!currentUserId){ alert('물품을 등록하려면 로그인하세요.'); openLoginModal(); return; }
+  // build sido options small copy
+  let sidoOptions = '<option value="">시·도 선택</option>';
+  Object.keys(REGION).forEach(s=> sidoOptions += `<option value="${s}">${s}</option>`);
+  openModal(`
+    <h3>물품 등록</h3>
+    <div class="form-row"><input id="itemTitle" placeholder="물품명 (예: 참고서 세트)"></div>
+    <div class="form-row"><textarea id="itemDesc" placeholder="상세 설명 (상태, 수량 등)" rows="3"></textarea></div>
+    <div class="form-row">
+      <select id="itemCategory"><option>책</option><option>의류</option><option>전자기기</option><option>기타</option></select>
+      <select id="itemCondition"><option>최상</option><option>좋음</option><option>보통</option><option>낡음</option></select>
+    </div>
+    <div class="form-row">
+      <input type="file" id="itemImage" accept="image/*">
+      <div class="preview" id="imgPreview">미리보기</div>
+    </div>
+    <div class="form-row">
+      <select id="regSido">${sidoOptions}</select>
+      <select id="regSigun"><option value="">시·군·구 선택</option></select>
+    </div>
+    <div class="form-actions"><button onclick="closeModal()">취소</button><button id="doRegisterBtn">등록</button></div>
+  `);
+
+  // wire events inside modal
+  const regSido = document.getElementById('regSido');
+  const regSigun = document.getElementById('regSigun');
+  const imgInput = document.getElementById('itemImage');
+  const preview = document.getElementById('imgPreview');
+
+  regSido.addEventListener('change', ()=>{
+    const v = regSido.value;
+    regSigun.innerHTML = '<option value="">시·군·구 선택</option>';
+    if(v && REGION[v]) REGION[v].forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; regSigun.appendChild(o); });
+  });
+
+  imgInput.addEventListener('change', (e)=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{ preview.style.backgroundImage = `url(${reader.result})`; preview.style.backgroundSize='cover'; preview.textContent=''; preview.dataset.src = reader.result; };
+    reader.readAsDataURL(f);
+  });
+
+  document.getElementById('doRegisterBtn').addEventListener('click', doRegisterItem);
+}
+function doRegisterItem(){
+  const title = document.getElementById('itemTitle').value.trim();
+  const desc = document.getElementById('itemDesc').value.trim();
+  const category = document.getElementById('itemCategory').value;
+  const condition = document.getElementById('itemCondition').value;
+  const sido = document.getElementById('regSido').value;
+  const sigun = document.getElementById('regSigun').value;
+  const preview = document.getElementById('imgPreview');
+  if(!title || !desc){ alert('물품명과 설명을 입력하세요.'); return; }
+  const image = preview.dataset.src || ''; // allow empty image, front will show placeholder
+  const it = {
+    id: util.uid('it'),
+    title, desc, category, condition,
+    image, ownerId: currentUserId,
+    sido: sido || '',
+    sigun: sigun || '',
+    status: 'available',
+    carbon: 0, // Part2 will compute using model
+    created: util.now()
+  };
+  items = util.load(STORAGE.ITEMS); items.unshift(it); util.save(STORAGE.ITEMS, items);
+  persistAll();
+  closeModal();
+  renderGrid();
+  renderPanel();
+  alert('물품이 등록되었습니다.');
+}
+
+/* ---------- Render grid (filters & search) ---------- */
+function renderGrid(){
+  users = util.load(STORAGE.USERS);
+  items = util.load(STORAGE.ITEMS);
+  requests = util.load(STORAGE.REQS);
+  chats = util.load(STORAGE.CHATS);
+
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const cat = document.getElementById('categoryFilter').value;
+  const sido = document.getElementById('sidoSelect').value;
+  const sigun = document.getElementById('sigunSelect').value;
+
+  gridEl.innerHTML = '';
+  items.filter(it=> it.status === 'available' ).forEach(it=>{
+    if(cat && it.category !== cat) return;
+    if(sido && it.sido !== sido) return;
+    if(sigun && it.sigun !== sigun) return;
+    if(q && !(it.title.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q))) return;
+
+    const owner = findUser(it.ownerId);
+    const card = document.createElement('div'); card.className='card';
+    const img = document.createElement('img'); img.src = it.image || placeholderImage(it.category);
+    const content = document.createElement('div'); content.className='card-content';
+    const h3 = document.createElement('h3'); h3.textContent = it.title;
+    const p = document.createElement('p'); p.textContent = it.desc;
+    const meta = document.createElement('div'); meta.className='small'; meta.textContent = `${it.category} · ${it.sido||''} ${it.sigun?('/ '+it.sigun):''} · 소유자: ${owner?owner.name:'-'}`;
+    const footer = document.createElement('div'); footer.className='card-footer';
+    const tag = document.createElement('div'); tag.className='tag'; tag.textContent = it.category;
+    const btn = document.createElement('button'); btn.className='exchange-btn'; btn.textContent = '교환 제안';
+    btn.addEventListener('click', ()=> openRequestModal(it.id));
+    const chatBtn = document.createElement('button'); chatBtn.className='btn'; chatBtn.style.background='transparent'; chatBtn.style.border='1px solid #e6e6e6'; chatBtn.textContent='채팅';
+    chatBtn.addEventListener('click', ()=> openOrCreateChat(it.id));
+    footer.appendChild(tag); footer.appendChild(btn);
+    content.appendChild(h3); content.appendChild(p); content.appendChild(meta); content.appendChild(footer);
+    card.appendChild(img); card.appendChild(content);
+    gridEl.appendChild(card);
+  });
+}
+
+/* placeholder image by category */
+function placeholderImage(category){
+  const map = {
+    '책':'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=60',
+    '의류':'https://images.unsplash.com/photo-1520975910870-83f4a4c3b5f1?auto=format&fit=crop&w=800&q=60',
+    '전자기기':'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?auto=format&fit=crop&w=800&q=60',
+    '기타':'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=60'
+  };
+  return map[category] || map['기타'];
+}
+
+/* ---------- Request flow (send request) ---------- */
+function openRequestModal(itemId){
+  if(!currentUserId){ alert('교환 제안하려면 로그인하세요.'); openLoginModal(); return; }
+  const it = findItem(itemId); if(!it) return alert('물품을 찾을 수 없습니다.');
+  if(it.ownerId === currentUserId) return alert('본인 물품입니다.');
+  const owner = findUser(it.ownerId);
+  openModal(`<h3>교환 제안: ${it.title}</h3>
+    <div class="small">소유자: ${owner?owner.name:'-'}</div>
+    <div class="form-row"><textarea id="reqMsg" rows="3" placeholder="교환 제안 메시지를 적어 주세요 (예: 이 참고서와 책 2권을 교환할게요)"></textarea></div>
+    <div class="form-actions"><button onclick="closeModal()">취소</button><button id="sendReqBtn">제안 보내기</button></div>`);
+  document.getElementById('sendReqBtn').addEventListener('click', ()=> sendRequest(itemId));
+}
+
+function sendRequest(itemId){
+  const msg = document.getElementById('reqMsg').value.trim();
+  const it = findItem(itemId);
+  const r = { id: util.uid('req'), itemId, fromUserId: currentUserId, toUserId: it.ownerId, message: msg, status:'pending', created: util.now() };
+  requests = util.load(STORAGE.REQS); requests.push(r); util.save(STORAGE.REQS, requests);
+  // create chat thread if none
+  chats = util.load(STORAGE.CHATS);
+  let thread = chats.find(c=> c.itemId === itemId && c.participants.includes(currentUserId) && c.participants.includes(it.ownerId));
+  if(!thread){
+    thread = { id: util.uid('ch'), itemId, topic: it.title, participants: [currentUserId, it.ownerId], messages: [] };
+    chats.push(thread); util.save(STORAGE.CHATS, chats);
+  }
+  thread.messages.push({ id: util.uid('m'), from: currentUserId, text: msg || '교환 제안드립니다.', time: util.now() });
+  util.save(STORAGE.CHATS, chats);
+  persistAll();
+  closeModal();
+  renderPanel();
+  alert('교환 제안이 전달되었습니다. 소유자의 알림에서 확인됩니다.');
+}
+
+/* ---------- Respond to requests (accept/reject) ---------- */
+function respondRequest(reqId, action){
+  requests = util.load(STORAGE.REQS);
+  const r = requests.find(x=>x.id===reqId); if(!r) return;
+  if(action === 'rejected'){ r.status = 'rejected'; util.save(STORAGE.REQS, requests); persistAll(); renderPanel(); alert('요청을 거절했습니다.'); return; }
+  if(action === 'accepted'){
+    r.status = 'accepted';
+    // perform trade: mark item as traded, award points (Part2 will have points calc)
+    items = util.load(STORAGE.ITEMS);
+    const it = items.find(i=> i.id === r.itemId);
+    if(!it){ alert('아이템이 존재하지 않습니다.'); return; }
+    it.status = 'traded';
+    util.save(STORAGE.ITEMS, items);
+    // update user stats
+    users = util.load(STORAGE.USERS);
+    const proposer = users.find(u=>u.id===r.fromUserId);
+    const owner = users.find(u=>u.id===r.toUserId);
+    if(proposer){ proposer.trades = (proposer.trades||0) + 1; }
+    if(owner){ owner.trades = (owner.trades||0) + 1; }
+    util.save(STORAGE.USERS, users);
+    // append chat message
+    chats = util.load(STORAGE.CHATS);
+    let thread = chats.find(c=> c.itemId === it.id && c.participants.includes(r.fromUserId) && c.participants.includes(r.toUserId));
+    if(!thread){
+      thread = { id: util.uid('ch'), itemId: it.id, topic: it.title, participants: [r.fromUserId, r.toUserId], messages: [] };
+      chats.push(thread);
+    }
+    thread.messages.push({ id: util.uid('m'), from: r.toUserId, text: '거래를 수락했습니다. 감사합니다!', time: util.now() });
+    util.save(STORAGE.CHATS, chats);
+    util.save(STORAGE.REQS, requests);
+    persistAll();
+    renderGrid(); renderPanel();
+    alert('거래가 완료되었습니다.');
+  }
+}
+
+/* expose respondRequest to window (used by panel buttons) */
+window.respondRequest = respondRequest;
+
+/* ---------- Chat functions ---------- */
+function openOrCreateChat(itemId){
+  if(!currentUserId){ alert('채팅을 이용하려면 로그인하세요.'); openLoginModal(); return; }
+  const it = findItem(itemId); if(!it) return;
+  chats = util.load(STORAGE.CHATS);
+  let thread = chats.find(c=> c.itemId === itemId && c.participants.includes(currentUserId));
+  if(!thread){
+    thread = { id: util.uid('ch'), itemId, topic: it.title, participants: [currentUserId, it.ownerId], messages: [] };
+    chats.push(thread); util.save(STORAGE.CHATS, chats);
+  }
+  openChatModal(thread.id);
+}
+function openChatModal(threadId){
+  const thread = findChat(threadId);
+  if(!thread) return alert('채팅을 찾을 수 없습니다.');
+  let html = `<h3>채팅 — ${thread.topic}</h3><div id="chatBox" style="max-height:360px;overflow:auto;border:1px solid #f0f0f0;padding:8px;margin-bottom:8px">`;
+  thread.messages.forEach(m=>{
+    const from = findUser(m.from) || {name:'익명'};
+    const side = (m.from === currentUserId) ? 'right' : 'left';
+    html += `<div style="margin:6px 0;text-align:${side}"><div style="display:inline-block;background:${m.from===currentUserId? 'linear-gradient(135deg,var(--main-green),var(--light-green))':'#f4f4f4'};color:${m.from===currentUserId? '#fff':'#333'};padding:8px;border-radius:8px;max-width:80%;">${m.text}</div><div class="small" style="margin-top:4px">${from.name}</div></div>`;
+  });
+  html += `</div><div class="form-row"><input id="chatInput" placeholder="메시지를 입력하세요"></div><div class="form-actions"><button onclick="closeModal()">닫기</button><button id="sendChatBtn">전송</button></div>`;
+  openModal(html);
+  document.getElementById('sendChatBtn').addEventListener('click', ()=> {
+    const txt = document.getElementById('chatInput').value.trim(); if(!txt) return;
+    thread.messages.push({ id: util.uid('m'), from: currentUserId, text: txt, time: util.now() });
+    util.save(STORAGE.CHATS, chats);
+    persistAll();
+    openChatModal(thread.id);
+  });
+}
+
+/* ---------- Panel rendering (notifications, chats, profile) ---------- */
+function renderPanel(){
+  users = util.load(STORAGE.USERS);
+  items = util.load(STORAGE.ITEMS);
+  requests = util.load(STORAGE.REQS);
+  chats = util.load(STORAGE.CHATS);
+
+  const me = findUser(currentUserId);
+  document.getElementById('avatar').textContent = me ? me.name.slice(0,2) : '?';
+  document.getElementById('profileName').textContent = me ? me.name : '비로그인';
+  document.getElementById('profileSchool').textContent = me ? me.school : '학교/지역 입력 필요';
+  document.getElementById('profilePoints').textContent = me ? (me.points || 0) : 0;
+  document.getElementById('profileTrades').textContent = me ? (me.trades || 0) : 0;
+
+  // notifications (requests to me)
+  const notifList = document.getElementById('notifList'); notifList.innerHTML = '';
+  if(!me){ notifList.innerHTML = '<div class="small">로그인하면 알림을 받을 수 있습니다.</div>'; }
+  else {
+    const mine = requests.filter(r => r.toUserId === me.id && r.status === 'pending');
+    if(mine.length === 0) notifList.innerHTML = '<div class="small">새 알림이 없습니다.</div>';
+    else mine.forEach(r=>{
+      const from = findUser(r.fromUserId) || {name:'익명'}; const it = findItem(r.itemId) || {title:'[삭제된 물품]'};
+      const div = document.createElement('div'); div.style.padding='8px'; div.style.border='1px dashed #eee'; div.style.marginBottom='8px';
+      div.innerHTML = `<div style="font-weight:700">${from.name}</div><div class="small">${it.title}에 대한 교환 제안</div>
+        <div style="margin-top:8px;text-align:right"><button onclick="respondRequest('${r.id}','accepted')" class="btn">수락</button> <button onclick="respondRequest('${r.id}','rejected')">거절</button></div>`;
+      notifList.appendChild(div);
+    });
+  }
+
+  // chat list (threads involving me)
+  const chatListEl = document.getElementById('chatList'); chatListEl.innerHTML = '';
+  if(!me) chatListEl.innerHTML = '<div class="small">로그인하면 채팅 목록을 볼 수 있습니다.</div>';
+  else {
+    const myThreads = chats.filter(c => c.participants.includes(me.id));
+    if(myThreads.length === 0) chatListEl.innerHTML = '<div class="small">채팅 스레드가 없습니다.</div>';
+    else myThreads.forEach(t=>{
+      const otherId = t.participants.find(p=>p!==me.id) || null;
+      const other = findUser(otherId) || {name:'익명'};
+      const el = document.createElement('div'); el.className='chat-item'; el.textContent = `${other.name} · ${t.topic}`;
+      el.onclick = ()=> openChatModal(t.id);
+      chatListEl.appendChild(el);
+    });
+  }
+}
+
+/* ---------- Placeholder for API integration points ----------
+   - processPayment(order): add real payment server call
+   - createShipping(order): add courier API call
+   These are intentionally left as stubs in Part1; Part2 will include example wiring.
+*/
+async function processPayment(order){ console.log('PAYMENT STUB', order); return {success:true, providerId:'MOCK'}; }
+async function createShipping(order){ console.log('SHIPPING STUB', order); return {success:true, tracking:'MOCK_TRK'}; }
+
+/* ---------- Initial render ---------- */
+renderGrid();
+renderPanel();
+
+/* ---------- Bind search/filter ---------- */
+document.getElementById('searchInput').addEventListener('input', ()=> renderGrid());
+document.getElementById('categoryFilter').addEventListener('change', ()=> renderGrid());
+document.getElementById('sidoSelect').addEventListener('change', ()=> renderGrid());
+document.getElementById('sigunSelect').addEventListener('change', ()=> renderGrid());
+
+/* ---------- Utility: expose some functions for debugging in console ---------- */
+window._TT = {
+  util, REGION, renderGrid, renderPanel, openRegisterModal, openLoginModal, openChatModal, processPayment, createShipping
+};
+</script>
+</body>
+</html>
+<style>
+#footerPanel {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background-color: #e8f5e9;
+  border-top: 1px solid #cfd8dc;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+}
+#footerPanel button {
+  background-color: #3b7a57;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#footerPanel button:hover {background-color:#2e5e43;}
+
+.modal {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.4); justify-content:center; align-items:center;
+}
+.modal-content {
+  background:white; padding:20px; border-radius:8px; width:90%; max-width:500px;
+  max-height:90vh; overflow:auto;
+}
+.modal h3 {color:#3b7a57;}
+.shop-item {
+  display:flex; justify-content:space-between; align-items:center;
+  border-bottom:1px solid #ccc; padding:8px 0;
+}
+.progress-bar {
+  width:100%; background:#c8e6c9; border-radius:5px; height:20px; margin-top:10px;
+}
+.progress-fill {
+  background:#3b7a57; height:100%; border-radius:5px; width:0%;
+}
+</style>
+
+<div id="footerPanel">
+  <button onclick="openModal('shopModal')">포인트 상점</button>
+  <button onclick="openModal('rankModal')">랭킹</button>
+  <button onclick="openModal('ecoModal')">탄소절감 현황</button>
+  <button onclick="openModal('payModal')">결제/배송</button>
+</div>
+
+<!-- 포인트 상점 -->
+<div id="shopModal" class="modal">
+  <div class="modal-content">
+    <h3>포인트 상점</h3>
+    <div id="shopList"></div>
+    <button onclick="closeModal('shopModal')">닫기</button>
+  </div>
+</div>
+
+<!-- 랭킹 -->
+<div id="rankModal" class="modal">
+  <div class="modal-content">
+    <h3>거래 랭킹</h3>
+    <ol id="rankList"></ol>
+    <button onclick="closeModal('rankModal')">닫기</button>
+  </div>
+</div>
+
+<!-- 탄소절감 현황 -->
+<div id="ecoModal" class="modal">
+  <div class="modal-content">
+    <h3>탄소 절감 대시보드</h3>
+    <p>지금까지 절약된 탄소 배출량:</p>
+    <div class="progress-bar">
+      <div class="progress-fill" id="carbonBar"></div>
+    </div>
+    <p><span id="carbonAmount">0</span> kg CO₂ 절감</p>
+    <button onclick="closeModal('ecoModal')">닫기</button>
+  </div>
+</div>
+
+<!-- 결제/배송 -->
+<div id="payModal" class="modal">
+  <div class="modal-content">
+    <h3>결제 / 배송 시스템 (API 연동 자리)</h3>
+    <p>아래 버튼은 실제 결제/배송 API(Toss, Stripe, CJ대한통운 등)에 연결될 수 있습니다.</p>
+    <input type="text" placeholder="거래 상품명" id="payItem"><br>
+    <input type="number" placeholder="금액(원)" id="payAmount"><br>
+    <button onclick="mockPayment()">결제하기</button>
+    <p id="paymentStatus" style="color:green;"></p>
+    <button onclick="closeModal('payModal')">닫기</button>
+  </div>
+</div>
+
+<script>
+// ----- 포인트 시스템 -----
+let points = parseInt(localStorage.getItem("ecoPoints") || "100");
+const shopItems = [
+  {name:"다회용 텀블러", cost:50},
+  {name:"친환경 장바구니", cost:30},
+  {name:"리필 세제 세트", cost:70},
+  {name:"업사이클 노트북 파우치", cost:120},
+  {name:"에코 스트로 세트", cost:25},
+  {name:"재활용 면 티셔츠", cost:60},
+  {name:"친환경 비누 세트", cost:40},
+  {name:"대나무 칫솔 2개 세트", cost:35},
+  {name:"천연 손 세정제", cost:45},
+  {name:"재생 종이 플래너", cost:55}
+];
+
+function openModal(id){
+  document.getElementById(id).style.display='flex';
+  if(id==='shopModal') loadShop();
+  if(id==='rankModal') loadRank();
+  if(id==='ecoModal') updateCarbon();
+}
+function closeModal(id){document.getElementById(id).style.display='none';}
+
+function loadShop(){
+  const div=document.getElementById("shopList");
+  div.innerHTML=`<p>현재 포인트: <b>${points}</b> P</p>`;
+  shopItems.forEach((item,i)=>{
+    const box=document.createElement("div");
+    box.className="shop-item";
+    box.innerHTML=`<span>${item.name} (${item.cost}P)</span>
+                   <button onclick="buyItem(${i})">구매</button>`;
+    div.appendChild(box);
+  });
+}
+function buyItem(i){
+  const item=shopItems[i];
+  if(points>=item.cost){
+    points-=item.cost;
+    localStorage.setItem("ecoPoints",points);
+    alert(`${item.name}을(를) 구매했습니다!`);
+    loadShop();
+  } else alert("포인트가 부족합니다.");
+}
+
+// ----- 랭킹 -----
+function loadRank(){
+  const rank=document.getElementById("rankList");
+  const items=JSON.parse(localStorage.getItem("ecoItems")||"[]");
+  const rankData={};
+  items.forEach(i=>{
+    if(!rankData[i.region]) rankData[i.region]=0;
+    rankData[i.region]++;
+  });
+  const sorted=Object.entries(rankData).sort((a,b)=>b[1]-a[1]);
+  rank.innerHTML='';
+  sorted.forEach(([region,count])=>{
+    const li=document.createElement("li");
+    li.textContent=`${region} - ${count}건 거래`;
+    rank.appendChild(li);
+  });
+  if(sorted.length===0) rank.innerHTML="<p>아직 거래 기록이 없습니다.</p>";
+}
+
+// ----- 탄소 절감 대시보드 -----
+function updateCarbon(){
+  const items=JSON.parse(localStorage.getItem("ecoItems")||"[]");
+  const saved = items.length * 1.5; // 거래당 평균 1.5kg CO₂ 절감
+  document.getElementById("carbonAmount").textContent=saved.toFixed(1);
+  const bar=document.getElementById("carbonBar");
+  const percent=Math.min(saved/100*100,100);
+  bar.style.width=percent+"%";
+}
+
+// ----- 결제/배송 모의 모듈 -----
+function mockPayment(){
+  const name=document.getElementById("payItem").value;
+  const amount=document.getElementById("payAmount").value;
+  if(!name||!amount){alert("상품명과 금액을 입력하세요.");return;}
+  document.getElementById("paymentStatus").textContent="결제가 완료되었습니다 (모의)";
+  // 여기에 실제 Toss/Stripe API 연동 코드 추가 가능
+}
+
+// ----- 거래 시 포인트/탄소 반영 -----
+function tradeItem(index){
+  const data=JSON.parse(localStorage.getItem("ecoItems")||"[]");
+  const item=data[index];
+  alert(`${item.name} 거래 요청 완료!`);
+  points+=10; // 거래 시 10포인트 적립
+  localStorage.setItem("ecoPoints",points);
+}
+</script>
